@@ -9,6 +9,26 @@ Runs entirely offline on CPU by default. No API key, no cloud account.
 
 ---
 
+## Prerequisites
+
+- **Docker with Compose v2** — `docker compose version` must work. On Windows and
+  macOS that is Docker Desktop, and **it must be running** before any command
+  below.
+- **~8 GB free disk** for the images and models: the two application images
+  (~700 MB), `pgvector/pgvector:pg16` (~440 MB), the Ollama image, and the two
+  models (`nomic-embed-text` ~274 MB, `llama3.2:3b` ~2 GB).
+- **RAM for the model.** `llama3.2:3b` is comfortable in ~4 GB; the larger models
+  in the catalog want ~8 GB (see `docs/decisions.md`, ADR-007).
+- **Network access on the first run** — the images, the two models, and the
+  transcript corpus are all fetched then.
+- **`make` is optional.** Every target is a thin wrapper over `docker compose`,
+  and the equivalents are listed below. `make` is **not** installed by default on
+  Windows.
+- **No API key and no cloud account are needed.** The default path is entirely
+  local.
+
+---
+
 ## Quickstart
 
 ```bash
@@ -22,8 +42,34 @@ open http://localhost:8080
 For a fast first run, `docker compose run --rm --profile ingest ingest --limit 25`
 gives a working corpus in minutes instead of the full 303-episode pass.
 
-On Windows without `make`, use the `docker compose` equivalents printed by
-`docker compose --help`; every Makefile target is a thin wrapper over Compose.
+### Without `make`
+
+`make` is a convenience wrapper, not a dependency. These are the same steps, and
+this is the path to use on Windows:
+
+```bash
+# Start the stack, then pull the models (once) and index the corpus
+docker compose up --build -d                                    # make up
+docker compose run --rm ollama-init                             # pulls the 2 models
+docker compose run --rm --profile ingest ingest                 # make ingest
+docker compose run --rm --profile ingest ingest --limit 25      # fast first run
+
+# Tests, metrics, lint
+docker compose run --rm api pytest tests/unit                   # make test-unit
+docker compose run --rm api pytest tests/integration            # make test-integration
+docker compose run --rm api pytest tests/xss                    # make test-xss
+docker compose run --rm api python -m scripts.eval              # make eval
+docker compose run --rm api python -m scripts.calibrate_floor   # make calibrate
+docker compose run --rm api ruff check app tests                # make lint
+
+# Operate
+docker compose logs -f --tail=100                               # make logs
+docker compose down                                             # keeps volumes
+```
+
+On Windows PowerShell, `cp .env.example .env` works as printed (`cp` is an alias
+for `Copy-Item`), and `open http://localhost:8080` becomes
+`Start-Process http://localhost:8080`.
 
 ---
 
@@ -105,9 +151,30 @@ session. Nothing needs rebuilding to switch.
 
 Local models run through Ollama. The catalog in `agent/models.json` ships
 `llama3.2:3b` (default), `qwen3:4b` and `qwen2.5:7b`; the last two need more RAM
-or time than the reference machine can spare (see ADR-007). Point
-`OLLAMA_BASE_URL` at a native Ollama (`http://host.docker.internal:11434`) to use
-host CPU instead of the Compose service.
+or time than the reference machine can spare (see ADR-007). The models are pulled
+by the `ollama-init` service (`make ingest`, or
+`docker compose run --rm ollama-init`).
+
+**Using an Ollama you already run on the host.** The API and the models can live
+outside Compose, which is useful on a machine that already has Ollama:
+
+1. Set `OLLAMA_BASE_URL=http://host.docker.internal:11434` in `.env`.
+2. Pull the models into **that** instance. `ollama-init` targets the Compose
+   service, not your native one:
+
+   ```bash
+   ollama pull nomic-embed-text && ollama pull llama3.2:3b
+   ```
+
+3. Start only what the API needs — **do not** run a bare `docker compose up -d`:
+
+   ```bash
+   docker compose up -d db api web
+   ```
+
+Step 3 matters: a bare `docker compose up -d` (or `make up`) also starts the
+Compose `ollama`, which binds port `11434` and shadows the native instance, so the
+API ends up talking to a service with no models pulled.
 
 Cloud is optional. With `ANTHROPIC_API_KEY` unset, `anthropic` appears in the UI
 as **unavailable with the reason** rather than silently disappearing, and
@@ -143,6 +210,34 @@ make down         # stop the stack, keep volumes
   omits citations, roughly doubling that turn's latency.
 - **Small golden set.** 13 questions, scoped to two episodes when it was written.
   Good enough to calibrate a method; not enough to settle a threshold.
+
+---
+
+## Troubleshooting
+
+The failures a first run actually hits, and what each means:
+
+- **Readiness says `degraded` with `embed_model` / `chat_model` "not pulled".**
+  The models are pulled by `ollama-init`, which is a separate step from starting
+  the stack. Run `docker compose run --rm ollama-init`, then re-check
+  `http://localhost:8000/api/health/ready`.
+- **A port is already in use (`8080`, `8000`, `5432`, `11434`).** Something else
+  is bound to it. Override `WEB_PORT` / `API_PORT` / `POSTGRES_PORT` in `.env`, or
+  stop the other process. Port `11434` specifically collides when a native Ollama
+  is running *and* the Compose `ollama` service is started — see the native-Ollama
+  recipe above.
+- **The first answer takes a minute or more.** Expected, and not a hang: inference
+  is CPU-bound and the model loads on first use. Retrieval itself is ~150 ms; the
+  wait is generation. Tokens stream as they are produced, so the turn is visibly
+  progressing, and `docker compose logs -f api` shows the phases.
+- **`make: command not found`.** `make` is optional — use the `docker compose`
+  commands in *Without `make`* above.
+- **The page loads but the health badge is not green, or the sidebar is empty.**
+  The API is still starting or unreachable from `web`: check `docker compose ps`
+  and `docker compose logs api`.
+- **`make ingest` appears to hang.** It is embedding ~5.1M tokens on CPU and is
+  expected to take on the order of two hours for all 303 episodes. Use
+  `--limit 25` for a working corpus in minutes; a later unlimited run tops it up.
 
 ---
 
