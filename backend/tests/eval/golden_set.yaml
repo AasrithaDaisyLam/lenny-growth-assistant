@@ -1,0 +1,82 @@
+# Golden set for relevance-floor calibration and (from Phase 10) `make eval`.
+#
+# Two classes, and the hard one is not the obvious one:
+#   in_corpus: true  -- the corpus answers this; retrieval must find it.
+#   in_corpus: false -- the corpus does NOT answer it. These are deliberately
+#                       same-domain, plausible-sounding questions, because a
+#                       non-sequitur is easy to reject and proves nothing.
+#
+# `expected_slugs` are the episodes that legitimately cover the question, used to
+# score retrieval recall. Leave empty for out-of-corpus questions.
+#
+# NOTE: this set is currently scoped to the two episodes indexed for Phase 4
+# development. It must be widened when the full corpus is ingested, and the floor
+# re-derived -- see docs/decisions.md (ADR-003).
+
+questions:
+  # --- In corpus -----------------------------------------------------------
+  - id: in-chesky-details
+    question: What does Brian Chesky say about leaders being in the details?
+    in_corpus: true
+    expected_slugs: [brian-chesky]
+
+  - id: in-chesky-pm
+    question: How does Brian Chesky run product management at Airbnb?
+    in_corpus: true
+    expected_slugs: [brian-chesky]
+
+  - id: in-chesky-paid-growth
+    question: Why did Airbnb shift away from paid growth channels?
+    in_corpus: true
+    expected_slugs: [brian-chesky]
+
+  - id: in-chesky-burnout
+    question: How does Brian Chesky avoid burnout and find balance?
+    in_corpus: true
+    expected_slugs: [brian-chesky]
+
+  - id: in-elena-activation
+    question: How does the growth team at Lovable work on activation?
+    in_corpus: true
+    expected_slugs: [elena-verna-40]
+
+  - id: in-elena-playbook
+    question: What is Elena Verna's AI growth playbook?
+    in_corpus: true
+    expected_slugs: [elena-verna-40]
+
+  - id: in-elena-arr
+    question: How did Lovable reach $200M ARR in one year?
+    in_corpus: true
+    expected_slugs: [elena-verna-40]
+
+  # --- Not in corpus (same domain, plausible, uncovered) -------------------
+  - id: out-pricing
+    question: How should I price a B2B SaaS product?
+    in_corpus: false
+    expected_slugs: []
+
+  - id: out-seo
+    question: What is the best way to do SEO for a two-sided marketplace?
+    in_corpus: false
+    expected_slugs: []
+
+  - id: out-patent
+    question: How do I file a patent for a software algorithm?
+    in_corpus: false
+    expected_slugs: []
+
+  - id: out-hiring-vpe
+    question: How should I interview and hire a VP of Engineering?
+    in_corpus: false
+    expected_slugs: []
+
+  - id: out-kubernetes
+    question: How do I set up a Kubernetes cluster for my startup?
+    in_corpus: false
+    expected_slugs: []
+
+  - id: out-sourdough
+    question: What is the recipe for sourdough bread?
+    in_corpus: false
+    expected_slugs: []

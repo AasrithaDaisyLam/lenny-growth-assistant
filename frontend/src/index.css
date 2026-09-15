@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* The shell is a full-height two-pane layout; without this the panes collapse to
+   their content height and the message list cannot scroll independently. */
+html,
+body,
+#root {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	-webkit-font-smoothing: antialiased;
+}

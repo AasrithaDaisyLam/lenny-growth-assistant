@@ -1,0 +1,65 @@
+{
+  "$comment": [
+    "Pi Coding Agent model catalog.",
+    "This file IS the provider toggle: switching models requires no application",
+    "code change and no restart. The active provider is surfaced in the UI.",
+    "",
+    "Ollama is declared natively as an OpenAI-compatible provider, so no",
+    "Anthropic-compatibility shim sits on the demo-critical path.",
+    "",
+    "NOTE: baseUrl here is a template. Pi interpolates credentials ($VAR in",
+    "'key'/'apiKey') but NOT baseUrl, so the app rewrites this value from",
+    "OLLAMA_BASE_URL when it materializes a writable Pi config home. Editing this",
+    "line alone will not change the URL the agent uses -- set OLLAMA_BASE_URL.",
+    "",
+    "The 'anthropic' entry only OVERRIDES the base URL of Pi's built-in",
+    "Anthropic provider -- its model list and OAuth/API-key auth still apply.",
+    "When ANTHROPIC_API_KEY is unset the value is unresolved, so Claude models",
+    "report as unavailable WITH A REASON rather than silently disappearing."
+  ],
+
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://ollama:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "llama3.2:3b",
+          "name": "Llama 3.2 3B (local, CPU)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "qwen3:4b",
+          "name": "Qwen3 4B (local, CPU)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 32768,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "qwen2.5:7b",
+          "name": "Qwen2.5 7B (local, needs ~8GB RAM)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 32768,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    },
+
+    "anthropic": {
+      "apiKey": "$ANTHROPIC_API_KEY"
+    }
+  }
+}
