@@ -295,3 +295,44 @@ bookkeeping.
 **Would change our mind.** A machine with ~8 GB spare would make `qwen2.5:7b` the
 better demo default for citation adherence (ADR-006). The catalog is the right place
 for that judgement, which is why it is a file and not a constant.
+
+---
+
+## ADR-008 — The SSE proxy location must not end in `/`
+
+**Decision.** In `frontend/nginx.conf`, the session proxy is `location /api/sessions`
+— **no trailing slash** — and both proxy blocks set `proxy_set_header Host $http_host`
+rather than `$host`.
+
+**Why.** With `location /api/sessions/`, nginx issued an automatic **301** from
+`GET /api/sessions` to `/api/sessions/`, and FastAPI's trailing-slash handling
+redirected `/api/sessions/` straight back to `/api/sessions`. FastAPI registers the
+collection route *without* the slash, so the two rules disagree and form a loop.
+
+The loop alone would be survivable. What made it a hard failure is that both hops
+built **absolute** URLs from a bare `$host`: nginx rewrote the `Host` header to
+`$host` (which carries no port), and Starlette builds its redirect from that same
+header. So the browser was sent to `http://localhost/api/sessions/` — **port 80**,
+where nothing listens — and `fetch` rejected with `TypeError: Failed to fetch`.
+
+The blast radius was exactly one endpoint, which is what made it confusing:
+`/api/providers`, `/api/health/ready` and every `/api/artifacts/...` route match the
+generic `location /api/` block and were unaffected. Only the session **collection**
+(`GET`/`POST /api/sessions`) — the first request the UI makes on load — was caught,
+so the app looked broken while the health badge stayed green.
+
+**Verified.** `GET /api/sessions` → **200** (was 301); `POST` → 201; `GET
+/api/sessions/{id}` and `/messages` → 200; the trailing-slash variant now 307s to
+`http://localhost:8080/api/sessions`, **keeping the port**. Streaming is unaffected:
+time-to-first-byte **12 ms** against a 170 s turn, which would be ~170 s if
+`proxy_buffering off` had been lost.
+
+**Worth knowing.** nginx **consumes** `X-Accel-Buffering` from the upstream and does
+not forward it to the client, so its absence in a browser devtools response is
+normal, not a regression. The effective control is `proxy_buffering off` in the
+location block; the header is a redundant second lever.
+
+**Would change our mind.** If the API ever serves two different routers under
+`/api/sessions` and `/api/sessions/`, the fix belongs in the app's routing rather
+than in nginx — but as long as FastAPI registers one canonical form, the proxy must
+not invent the other.
